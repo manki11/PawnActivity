@@ -1,4 +1,4 @@
-define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon", "webL10n"], function (activity, env, icon, webL10n) {
+define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon", "webL10n","sugar-web/graphics/presencepalette"], function (activity, env, icon, webL10n, presencepalette) {
     // Manipulate the DOM only when it is ready.
     require(['domReady!'], function (doc) {
 
@@ -6,6 +6,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
         activity.setup();
 
         var currentenv;
+        var isHost = false;
         env.getEnvironment(function(err, environment) {
             currentenv = environment;
 
@@ -25,7 +26,47 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
                     }
                 });
             }
+
+            // Shared instances
+            if (environment.sharedId) {
+                console.log("Shared instance");
+                presence = activity.getPresenceObject(function(error, network) {
+                    network.onDataReceived(onNetworkDataReceived);
+                    network.onSharedActivityUserChanged(onNetworkUserChanged);
+                });
+            }
         });
+
+        var onNetworkUserChanged = function(msg) {
+            if (isHost) {
+                console.log("sending pawns");
+                presence.sendMessage(presence.getSharedInfo().id, {
+                    user: presence.getUserInfo(),
+                    content: {
+                        action: 'init',
+                        data: pawns
+                    }
+                });
+            }
+            console.log("User "+msg.user.name+" "+(msg.move == 1 ? "join": "leave"));
+        };
+
+        var onNetworkDataReceived = function(msg) {
+            if (presence.getUserInfo().networkId === msg.user.networkId) {
+                return;
+            }
+            switch (msg.content.action) {
+                case 'init':
+                    pawns = msg.content.data;
+                    drawPawns();
+                    break;
+                case 'update':
+                    pawns.push(msg.content.data);
+                    drawPawns();
+                    document.getElementById("user").innerHTML = "<h1>"+webL10n.get("Played", {name:msg.user.name})+"</h1>";
+                    break;
+            }
+        };
 
         // Draw pawns
         var pawns = [];
@@ -47,6 +88,16 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
             drawPawns();
 
             document.getElementById("user").innerHTML = "<h1>"+webL10n.get("Played", {name:currentenv.user.name})+"</h1>";
+
+            if (presence) {
+                presence.sendMessage(presence.getSharedInfo().id, {
+                    user: presence.getUserInfo(),
+                    content: {
+                        action: 'update',
+                        data: currentenv.user.colorvalue
+                    }
+                });
+            }
         });
 
         // Save in Journal on Stop
@@ -67,6 +118,27 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
         window.addEventListener("localized", function() {
             document.getElementById("user").innerHTML = "<h1>"+webL10n.get("Hello", {name:currentenv.user.name})+"</h1>";
             document.getElementById("add-button").title = webL10n.get("AddPawn");
+        });
+
+
+        // Link presence palette
+        var presence = null;
+        var palette = new presencepalette.PresencePalette(document.getElementById("network-button"), undefined);
+        palette.addEventListener('shared', function() {
+            palette.popDown();
+            console.log("Want to share");
+            presence = activity.getPresenceObject(function(error, network) {
+                if (error) {
+                    console.log("Sharing error");
+                    return;
+                }
+                network.createSharedActivity('org.sugarlabs.Pawn', function(groupId) {
+                    console.log("Activity shared");
+                    isHost=true;
+                });
+                network.onDataReceived(onNetworkDataReceived);
+                network.onSharedActivityUserChanged(onNetworkUserChanged);
+            });
         });
 
 
