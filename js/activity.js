@@ -1,13 +1,30 @@
-define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon"], function (activity, env, icon) {    // Manipulate the DOM only when it is ready.
+define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon", "webL10n"], function (activity, env, icon, webL10n) {
+    // Manipulate the DOM only when it is ready.
     require(['domReady!'], function (doc) {
 
         // Initialize the activity.
         activity.setup();
 
         var currentenv;
-        env.getEnvironment(function (err, environment) {
+        env.getEnvironment(function(err, environment) {
             currentenv = environment;
-            document.getElementById("user").innerHTML = "<h1>" + "Hello" + " " + environment.user.name + " !</h1>";
+
+            // Set current language to Sugarizer
+            var defaultLanguage = (typeof chrome != 'undefined' && chrome.app && chrome.app.runtime) ? chrome.i18n.getUILanguage() : navigator.language;
+            var language = environment.user ? environment.user.language : defaultLanguage;
+            webL10n.language.code = language;
+
+            // Load from datastore
+            if (!environment.objectId) {
+                console.log("New instance");
+            } else {
+                activity.getDatastoreObject().loadAsText(function(error, metadata, data) {
+                    if (error==null && data!=null) {
+                        pawns = JSON.parse(data);
+                        drawPawns();
+                    }
+                });
+            }
         });
 
         // Draw pawns
@@ -29,7 +46,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
             pawns.push(currentenv.user.colorvalue);
             drawPawns();
 
-            document.getElementById("user").innerHTML = "<h1>" + currentenv.user.name + " played !</h1>";
+            document.getElementById("user").innerHTML = "<h1>"+webL10n.get("Played", {name:currentenv.user.name})+"</h1>";
         });
 
         // Save in Journal on Stop
@@ -46,21 +63,10 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
             });
         });
 
-        env.getEnvironment(function(err, environment) {
-            currentenv = environment;
-            document.getElementById("user").innerHTML = "<h1>"+"Hello"+" "+environment.user.name+" !</h1>";
-
-            // Load from datastore
-            if (!environment.objectId) {
-                console.log("New instance");
-            } else {
-                activity.getDatastoreObject().loadAsText(function(error, metadata, data) {
-                    if (error==null && data!=null) {
-                        pawns = JSON.parse(data);
-                        drawPawns();
-                    }
-                });
-            }
+        // Process localize event
+        window.addEventListener("localized", function() {
+            document.getElementById("user").innerHTML = "<h1>"+webL10n.get("Hello", {name:currentenv.user.name})+"</h1>";
+            document.getElementById("add-button").title = webL10n.get("AddPawn");
         });
 
 
