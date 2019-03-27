@@ -1,4 +1,4 @@
-define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon", "webL10n","sugar-web/graphics/presencepalette"], function (activity, env, icon, webL10n, presencepalette) {
+define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon", "webL10n","sugar-web/graphics/presencepalette", "sugar-web/datastore", "sugar-web/graphics/journalchooser"], function (activity, env, icon, webL10n, presencepalette, datastore, journalchooser) {
     // Manipulate the DOM only when it is ready.
     require(['domReady!'], function (doc) {
 
@@ -100,6 +100,19 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
             }
         });
 
+        document.getElementById("picture-button").addEventListener('click', function (e) {
+            journalchooser.show(function (entry) {
+                if (!entry) {
+                    return;
+                }
+                // Get object content
+                var dataentry = new datastore.DatastoreObject(entry.objectId);
+                dataentry.loadAsText(function (err, metadata, data) {
+                    document.getElementById("canvas").style.backgroundImage = "url('"+data+"')";
+                });
+            }, {mimetype: 'image/png'}, {mimetype: 'image/jpeg'});
+        });
+
         // Save in Journal on Stop
         document.getElementById("stop-button").addEventListener('click', function (event) {
             console.log("writing...");
@@ -142,6 +155,9 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/icon
         });
 
 
+
+
     });
 
 });
+
